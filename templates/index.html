@@ -1,0 +1,307 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>DNS Query Tool</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <header>
+            <div class="logo">DNS<span>LOOKUP</span></div>
+            <p>Domain Name System Analysis Tool</p>
+        </header>
+
+        <section class="search-box">
+
+            <h1>DNS Query Tool</h1>
+
+            <p>
+                Discover DNS records and retrieve domain information.
+            </p>
+
+<form method="POST" id="lookupForm">
+
+    <input
+        type="text"
+        name="domain"
+        id="domainInput"
+        placeholder="Enter domain (e.g. google.com)"
+        value="{{ domain }}"
+        required
+    >
+
+    <button type="submit">Lookup DNS</button>
+
+</form>
+<div id="loadingMessage" class="loading-message">
+    <div class="loader"></div>
+    <p>Looking up DNS records...</p>
+</div>
+
+        </section>
+
+        {% if results %}
+
+        <section class="results">
+
+            <h2>Results for {{ domain }}</h2>
+
+            <div class="time">
+                Total Lookup Time: {{ lookup_time }} ms
+            </div>
+
+            <div class="record-grid">
+
+                {% for record_type, data in results.items() %}
+
+                <div class="record-card">
+
+                    <h3>{{ record_type }} Record</h3>
+
+                    {% if data.records %}
+
+                        {% for record in data.records %}
+                            <p class="record-value">{{ record }}</p>
+                        {% endfor %}
+
+                    {% else %}
+
+                        <p class="no-record">
+                            {{ data.status }}
+                        </p>
+
+                    {% endif %}
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+<div class="explanation-section">
+
+    <h2>Understanding DNS Records</h2>
+
+    <p class="explanation-subtitle">
+        Learn what each DNS record does.
+    </p>
+
+    <div class="explanation-grid">
+
+        <div class="explanation-card">
+            <h3>A Record</h3>
+            <p>
+                Maps a domain name to an IPv4 address.
+                It helps computers locate websites.
+            </p>
+        </div>
+
+        <div class="explanation-card">
+            <h3>AAAA Record</h3>
+            <p>
+                Maps a domain name to an IPv6 address.
+                It supports the newer Internet Protocol version.
+            </p>
+        </div>
+
+        <div class="explanation-card">
+            <h3>MX Record</h3>
+            <p>
+                Identifies the mail servers responsible
+                for receiving emails for a domain.
+            </p>
+        </div>
+
+        <div class="explanation-card">
+            <h3>NS Record</h3>
+            <p>
+                Identifies the name servers responsible
+                for a domain's DNS information.
+            </p>
+        </div>
+
+        <div class="explanation-card">
+            <h3>CNAME Record</h3>
+            <p>
+                Creates an alias that points one domain
+                name to another canonical domain name.
+            </p>
+        </div>
+
+        <div class="explanation-card">
+            <h3>TXT Record</h3>
+            <p>
+                Stores text information associated
+                with a domain, including verification
+                and email security policies.
+            </p>
+        </div>
+
+    </div>
+
+</div>
+
+
+        </section>
+        
+<form action="/export" method="POST" class="export-form">
+
+    <input
+        type="hidden"
+        name="domain"
+        value="{{ domain }}"
+    >
+
+    <button type="submit" class="export-button">
+        Download DNS Report
+    </button>
+
+</form>
+<button type="button" id="clearResults" class="clear-results-button">
+    Clear Results
+</button>
+{% endif %}
+        
+<section class="history-section">
+
+    <div class="history-heading">
+        <h2>Search History</h2>
+
+        <button type="button" id="clearHistory">
+            Clear History
+        </button>
+    </div>
+
+    <div id="historyList">
+        <p class="empty-history">
+            No search history yet.
+        </p>
+    </div>
+
+</section>
+
+        <footer>
+            <p>Computer Networks Mini Project | DNS Query Tool</p>
+        </footer>
+
+    </div>
+
+<script>
+
+const form = document.getElementById("lookupForm");
+const loadingMessage = document.getElementById("loadingMessage");
+
+form.addEventListener("submit", function() {
+    loadingMessage.style.display = "flex";
+});
+const clearResultsButton = document.getElementById("clearResults");
+
+if (clearResultsButton) {
+    clearResultsButton.addEventListener("click", function() {
+        window.location.href = "/";
+    });
+}
+const domainInput = document.getElementById("domainInput");
+const historyList = document.getElementById("historyList");
+const clearButton = document.getElementById("clearHistory");
+
+const STORAGE_KEY = "dnsSearchHistory";
+
+// Load saved history
+function getHistory() {
+    return JSON.parse(
+        localStorage.getItem(STORAGE_KEY) || "[]"
+    );
+}
+
+// Save a domain to history
+function saveHistory(domain) {
+
+    let history = getHistory();
+
+    history = history.filter(
+        item => item !== domain
+    );
+
+    history.unshift(domain);
+
+    history = history.slice(0, 10);
+
+    localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(history)
+    );
+}
+
+// Display search history
+function displayHistory() {
+
+    const history = getHistory();
+
+    historyList.innerHTML = "";
+
+    if (history.length === 0) {
+        historyList.innerHTML =
+            '<p class="empty-history">No search history yet.</p>';
+        return;
+    }
+
+    history.forEach(domain => {
+
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.className = "history-item";
+        button.textContent = domain;
+
+        button.addEventListener("click", function() {
+
+            domainInput.value = domain;
+            form.requestSubmit();
+
+        });
+
+        historyList.appendChild(button);
+
+    });
+}
+
+// Save valid-looking domain searches
+form.addEventListener("submit", function(event) {
+
+    const domain = domainInput.value.trim();
+
+    const pattern =
+        /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}\.?$/;
+
+    if (pattern.test(domain)) {
+        saveHistory(domain);
+    }
+
+});
+
+// Clear search history
+clearButton.addEventListener("click", function() {
+
+    localStorage.removeItem(STORAGE_KEY);
+
+    displayHistory();
+
+});
+
+// Display history when page loads
+displayHistory();
+
+</script>
+
+</body>
+</html>
